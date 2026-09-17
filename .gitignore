@@ -1,0 +1,20 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+
+# Vector store and processed artifacts
+chroma_db/
+data/processed/*
+!data/processed/.gitkeep
+*.faiss
+*.pkl
+
+# Local knowledge-base dumps
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/README.md

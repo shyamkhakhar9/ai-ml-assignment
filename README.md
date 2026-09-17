@@ -19,7 +19,7 @@ LangChain agent (prompts + chat memory)
 - Destination facts come only from retrieved documents.
 - Weather and exchange rates come only from MCP tools.
 - Combined questions use both sources.
-- The UI currently returns retrieved passages and source links.
+- The UI labels knowledge-base passages and MCP tool results separately.
 
 ## Knowledge-base sources
 
@@ -45,10 +45,17 @@ Wikivoyage is downloaded via the MediaWiki API (CC BY-SA). Visit Singapore files
 
 ## MCP tools
 
-| Tool | Purpose |
-| --- | --- |
-| Weather | Current conditions and forecast for Singapore |
-| Currency | Convert amounts (for example INR ↔ SGD) |
+| Tool | Purpose | Backend |
+| --- | --- | --- |
+| `weather_forecast` | Current conditions and up to 7-day forecast | Open-Meteo |
+| `convert_currency` | Convert amounts such as INR ↔ SGD | Frankfurter |
+
+Both servers speak MCP over stdio. The app selects a tool from the question, passes arguments, and labels the result as current information from that tool. If a tool fails, the UI reports the failure and does not invent weather or rates. Destination questions stay on the knowledge base.
+
+```bash
+python -m mcp_servers.client weather --location Singapore --days 3
+python -m mcp_servers.client convert --amount 50000 --from-currency INR --to-currency SGD
+```
 
 ## Prompt and context strategy
 
@@ -78,6 +85,8 @@ cp .env.example .env
 python -m kb.fetch_sources
 python -m kb.ingest
 python -m kb.retrieve "What are the must-visit attractions in Singapore?"
+python -m mcp_servers.client weather --days 3
+python -m mcp_servers.client convert --amount 50000 --from-currency INR --to-currency SGD
 PYTHONPATH=. streamlit run app/ui.py
 ```
 

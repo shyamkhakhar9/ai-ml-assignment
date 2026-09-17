@@ -1,6 +1,6 @@
 {
   "destination": "Singapore",
-  "notes": "Keep the original title and URL as chunk metadata. Review each source's reuse terms before redistributing extracted content.",
+  "notes": "Keep the original title and URL as chunk metadata. Wikivoyage is CC BY-SA. Visit Singapore pages are local excerpts for this assignment; review STB terms before redistributing.",
   "sources": [
     {
       "id": "wikivoyage-singapore",
@@ -15,7 +15,7 @@
         "itineraries"
       ],
       "local_path": "data/raw/wikivoyage-singapore.md",
-      "status": "pending_download"
+      "status": "ready"
     },
     {
       "id": "visit-singapore-essential",
@@ -29,7 +29,7 @@
         "useful services"
       ],
       "local_path": "data/raw/visit-singapore-essential.md",
-      "status": "pending_download"
+      "status": "ready"
     },
     {
       "id": "visit-singapore-itineraries",
@@ -41,7 +41,7 @@
         "traveller profiles"
       ],
       "local_path": "data/raw/visit-singapore-itineraries.md",
-      "status": "pending_download"
+      "status": "ready"
     },
     {
       "id": "visit-singapore-things-to-do",
@@ -53,7 +53,7 @@
         "indoor and outdoor options"
       ],
       "local_path": "data/raw/visit-singapore-things-to-do.md",
-      "status": "pending_download"
+      "status": "ready"
     }
   ]
 }

@@ -19,29 +19,29 @@ LangChain agent (prompts + chat memory)
 - Destination facts come only from retrieved documents.
 - Weather and exchange rates come only from MCP tools.
 - Combined questions use both sources.
-- The UI should label knowledge-base sources, MCP results, and model suggestions separately.
+- The UI currently returns retrieved passages and source links.
 
 ## Knowledge-base sources
 
 At least three public resources (see `kb/sources.json`):
 
-| Source | URL |
-| --- | --- |
-| Wikivoyage Singapore Travel Guide | https://en.wikivoyage.org/wiki/Singapore |
-| Visit Singapore: Essential Travel Information | https://www.visitsingapore.com/travel-guide-tips/traveller-information/ |
-| Visit Singapore: Sample Itineraries | https://www.visitsingapore.com/travel-tips/travelling-to-singapore/itineraries/ |
-| Visit Singapore: Things to Do | https://www.visitsingapore.com/see-do-singapore/ |
+| Source | URL | Local file |
+| --- | --- | --- |
+| Wikivoyage Singapore Travel Guide | https://en.wikivoyage.org/wiki/Singapore | `data/raw/wikivoyage-singapore.md` |
+| Visit Singapore: Essential Travel Information | https://www.visitsingapore.com/travel-guide-tips/traveller-information/ | `data/raw/visit-singapore-essential.md` |
+| Visit Singapore: Sample Itineraries | https://www.visitsingapore.com/travel-tips/travelling-to-singapore/itineraries/ | `data/raw/visit-singapore-itineraries.md` |
+| Visit Singapore: Things to Do | https://www.visitsingapore.com/see-do-singapore/ | `data/raw/visit-singapore-things-to-do.md` |
 
-Place downloaded files under `data/raw/` before ingest. Keep original titles and URLs as metadata. Review reuse terms before redistributing extracted content.
+Wikivoyage is downloaded via the MediaWiki API (CC BY-SA). Visit Singapore files are excerpts with original titles and URLs retained as metadata. Review STB reuse terms before redistributing those excerpts.
 
 ## RAG workflow
 
-1. Load travel content from `data/raw/`.
-2. Split into meaningful chunks.
-3. Embed chunks and store them in Chroma (`chroma_db/`).
-4. Retrieve relevant chunks for each question.
-5. Generate grounded answers with source title and link.
-6. If the knowledge base is insufficient, say so instead of inventing facts.
+1. Load travel content from `data/raw/` using `kb/sources.json`.
+2. Split on Markdown headings, then into ~1000-token chunks with 150-token overlap.
+3. Embed with `sentence-transformers/all-MiniLM-L6-v2` (or OpenAI if `EMBEDDING_PROVIDER=openai`).
+4. Store vectors in Chroma at `chroma_db/` with `source_title`, `source_url`, and `section`.
+5. Retrieve the top matching chunks for each question (default `k=5`).
+6. If no chunk scores above `RETRIEVAL_MIN_SCORE`, the app states that the knowledge base is insufficient instead of inventing facts.
 
 ## MCP tools
 
@@ -49,8 +49,6 @@ Place downloaded files under `data/raw/` before ingest. Keep original titles and
 | --- | --- |
 | Weather | Current conditions and forecast for Singapore |
 | Currency | Convert amounts (for example INR ↔ SGD) |
-
-Tools must not answer destination questions already covered by the knowledge base. Failed or unavailable tools must not produce fabricated values.
 
 ## Prompt and context strategy
 
@@ -60,10 +58,10 @@ Prompt instructions live in `app/prompts.py`. The model should use retrieved con
 
 ```
 app/                 Streamlit UI, agent, prompts
-kb/                  Source catalog and ingest script
+kb/                  Sources, fetch, ingest, retrieval
 mcp_servers/         Weather and currency MCP servers
-data/raw/            Downloaded source documents
-data/processed/      Optional processed files
+data/raw/            Source documents
+chroma_db/           Local vector store (generated, not committed)
 samples/             Sample questions and captured responses
 ```
 
@@ -77,9 +75,13 @@ cp .env.example .env
 ```
 
 ```bash
+python -m kb.fetch_sources
 python -m kb.ingest
+python -m kb.retrieve "What are the must-visit attractions in Singapore?"
 PYTHONPATH=. streamlit run app/ui.py
 ```
+
+`fetch_sources` refreshes Wikivoyage. Visit Singapore Markdown is left in place unless you pass `--refresh-web`.
 
 ## Out of scope
 

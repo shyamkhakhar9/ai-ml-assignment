@@ -1,5 +1,12 @@
-# Knowledge-base sources
+# Raw knowledge-base sources
 
-Place downloaded public travel documents here (Markdown, HTML, PDF, or plain text).
+Markdown files here are produced by `python -m kb.fetch_sources`.
 
-Each file should map to an entry in `kb/sources.json` so ingest can attach `source_title` and `source_url` metadata.
+| File | Source |
+| --- | --- |
+| `wikivoyage-singapore.md` | https://en.wikivoyage.org/wiki/Singapore (CC BY-SA) |
+| `visit-singapore-essential.md` | Visit Singapore essential travel information |
+| `visit-singapore-itineraries.md` | Visit Singapore sample itineraries |
+| `visit-singapore-things-to-do.md` | Visit Singapore things to do / neighbourhoods |
+
+Review reuse terms before redistributing extracted Visit Singapore content.

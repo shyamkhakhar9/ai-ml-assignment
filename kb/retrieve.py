@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from functools import lru_cache
 
 from langchain_chroma import Chroma
 
@@ -57,6 +58,7 @@ INSUFFICIENT_MESSAGE = (
 )
 
 
+@lru_cache(maxsize=1)
 def load_vectorstore() -> Chroma:
     if not VECTOR_DIR.exists():
         raise FileNotFoundError(

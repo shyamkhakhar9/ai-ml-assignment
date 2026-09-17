@@ -19,7 +19,7 @@ LangChain agent (prompts + chat memory)
 - Destination facts come only from retrieved documents.
 - Weather and exchange rates come only from MCP tools.
 - Combined questions use both sources.
-- The UI labels knowledge-base passages and MCP tool results separately.
+- The UI keeps multi-turn chat history and labels knowledge-base facts, MCP results, and generated recommendations.
 
 ## Knowledge-base sources
 
@@ -50,7 +50,7 @@ Wikivoyage is downloaded via the MediaWiki API (CC BY-SA). Visit Singapore files
 | `weather_forecast` | Current conditions and up to 7-day forecast | Open-Meteo |
 | `convert_currency` | Convert amounts such as INR ↔ SGD | Frankfurter |
 
-Both servers speak MCP over stdio. The app selects a tool from the question, passes arguments, and labels the result as current information from that tool. If a tool fails, the UI reports the failure and does not invent weather or rates. Destination questions stay on the knowledge base.
+Both servers speak MCP over stdio. The assistant selects tools from the user question (LangChain tool calling when `OPENAI_API_KEY` is set; otherwise retrieval plus MCP still run and are labelled). If a tool fails, the answer reports the failure and does not invent weather or rates. Destination questions stay on the knowledge base.
 
 ```bash
 python -m mcp_servers.client weather --location Singapore --days 3
@@ -59,7 +59,15 @@ python -m mcp_servers.client convert --amount 50000 --from-currency INR --to-cur
 
 ## Prompt and context strategy
 
-Prompt instructions live in `app/prompts.py`. The model should use retrieved content for destination facts, MCP output for current information, keep user preferences across turns, and distinguish facts from generated recommendations.
+Prompt instructions live in `app/prompts.py`. The model (or the fallback composer) must:
+
+- Use retrieved chunks as the only destination facts, with source titles and URLs.
+- Use MCP output as the only weather and FX data.
+- Keep preferences from earlier turns, such as family-friendly or a budget.
+- Separate knowledge-base facts, MCP current information, and generated itinerary suggestions.
+- Say when retrieval or a tool is insufficient instead of inventing details.
+
+`app/agent.py` keeps the last several chat turns and exposes `search_destination_knowledge`, `weather_forecast`, and `convert_currency` as tools. Combined requests such as a three-day weather-aware itinerary call both RAG and the weather MCP tool.
 
 ## Project layout
 
@@ -87,8 +95,11 @@ python -m kb.ingest
 python -m kb.retrieve "What are the must-visit attractions in Singapore?"
 python -m mcp_servers.client weather --days 3
 python -m mcp_servers.client convert --amount 50000 --from-currency INR --to-currency SGD
+PYTHONPATH=. python -m app.agent "Create a three-day Singapore itinerary for next week and adjust it according to the weather forecast."
 PYTHONPATH=. streamlit run app/ui.py
 ```
+
+Set `OPENAI_API_KEY` in `.env` to use the LangChain tool-calling model (`OPENAI_MODEL`, default `gpt-4o-mini`). Without a key, the app still retrieves documents, calls MCP tools, and returns a labelled combined answer.
 
 `fetch_sources` refreshes Wikivoyage. Visit Singapore Markdown is left in place unless you pass `--refresh-web`.
 

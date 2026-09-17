@@ -18,7 +18,7 @@ COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "singapore_travel")
 CHUNK_SIZE_TOKENS = 1000
 CHUNK_OVERLAP_TOKENS = 150
 RETRIEVAL_K = int(os.getenv("RETRIEVAL_K", "5"))
-RETRIEVAL_MIN_SCORE = float(os.getenv("RETRIEVAL_MIN_SCORE", "0.35"))
+RETRIEVAL_MIN_SCORE = float(os.getenv("RETRIEVAL_MIN_SCORE", "0.40"))
 
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "huggingface").lower()
 HF_EMBEDDING_MODEL = os.getenv(

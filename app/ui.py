@@ -1,4 +1,4 @@
-"""Streamlit UI for knowledge-base search and MCP weather/currency tools."""
+"""Streamlit chat UI for the RAG + MCP travel assistant."""
 
 from __future__ import annotations
 
@@ -6,133 +6,76 @@ from pathlib import Path
 
 import streamlit as st
 
-from app.intent import route_question
+from app.agent import AgentTurn, ChatMessage, run_turn
 from app.prompts import SYSTEM_PROMPT
-from mcp_servers.client import call_convert_currency, call_weather_forecast
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _render_weather(result) -> None:
-    st.markdown("**MCP tool: weather**")
-    if not result.ok:
-        st.warning(
-            "The weather tool failed or is unavailable. "
-            "Current conditions will not be guessed."
+def _render_turn(turn: AgentTurn) -> None:
+    st.markdown(turn.answer)
+    if turn.tools_used:
+        with st.expander("Tools used"):
+            for event in turn.tools_used:
+                status = "ok" if event.ok else "failed"
+                st.markdown(f"- **{event.name}** ({status})")
+                if not event.ok:
+                    st.caption(str(event.payload.get("error") or "Tool failed."))
+    if turn.sources:
+        with st.expander("Sources"):
+            for source in turn.sources:
+                title = source.get("title") or "Source"
+                url = source.get("url") or ""
+                if url:
+                    st.markdown(f"- [{title}]({url})")
+                else:
+                    st.markdown(f"- {title}")
+    if not turn.used_llm:
+        st.caption(
+            "Answer assembled from the knowledge base and MCP tools. "
+            "Set OPENAI_API_KEY to enable the LangChain tool-calling model."
         )
-        st.caption(result.error or "Unknown error")
-        return
-    data = result.data
-    location = data.get("location") or {}
-    current = data.get("current") or {}
-    st.write(
-        f"Current information from the weather tool for "
-        f"{location.get('name', 'the destination')} ({data.get('source', 'MCP')})."
-    )
-    st.write(
-        f"Now: {current.get('condition')}, {current.get('temperature_c')}°C, "
-        f"humidity {current.get('humidity_pct')}%."
-    )
-    daily = data.get("daily") or []
-    if daily:
-        st.table(
-            [
-                {
-                    "Date": row.get("date"),
-                    "Condition": row.get("condition"),
-                    "Min °C": row.get("temp_min_c"),
-                    "Max °C": row.get("temp_max_c"),
-                    "Rain %": row.get("rain_probability_pct"),
-                    "Prefer indoor": "Yes" if row.get("prefer_indoor") else "No",
-                }
-                for row in daily
-            ]
-        )
-
-
-def _render_currency(result) -> None:
-    st.markdown("**MCP tool: currency**")
-    if not result.ok:
-        st.warning(
-            "The currency tool failed or is unavailable. "
-            "An exchange rate will not be guessed."
-        )
-        st.caption(result.error or "Unknown error")
-        return
-    data = result.data
-    st.write(f"Current information from the currency tool ({data.get('source', 'MCP')}).")
-    st.write(
-        f"{data.get('amount')} {data.get('from_currency')} = "
-        f"{data.get('converted_amount')} {data.get('to_currency')} "
-        f"(rate {data.get('rate')} on {data.get('date')})."
-    )
-
-
-def _render_rag(query: str) -> None:
-    st.markdown("**Knowledge base**")
-    try:
-        from kb.retrieve import retrieve
-
-        result = retrieve(query)
-    except FileNotFoundError as exc:
-        st.error(str(exc))
-        return
-    except Exception as exc:
-        st.error(f"Knowledge-base retrieval is unavailable: {exc}")
-        return
-    if not result.sufficient:
-        st.warning(result.message)
-        return
-    for index, chunk in enumerate(result.chunks, start=1):
-        st.markdown(f"**[{index}] {chunk.source_title}** · score `{chunk.score:.3f}`")
-        st.caption(chunk.section)
-        st.write(chunk.content)
-    with st.expander("Sources"):
-        for source in result.sources():
-            st.markdown(f"- [{source['title']}]({source['url']})")
 
 
 def main() -> None:
     st.set_page_config(page_title="AI Travel Planning Assistant", page_icon="✈️")
     st.title("AI Travel Planning Assistant")
     st.caption("Singapore")
-
     st.markdown("**Destination:** Singapore")
     st.info(
         "Destination facts come from the knowledge base. "
         "Weather and currency come from MCP tools. "
-        "Failed tools are reported instead of inventing values."
+        "Recommendations are labelled separately from sourced facts."
     )
 
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    for item in st.session_state.messages:
+        with st.chat_message(item["role"]):
+            if item["role"] == "assistant" and item.get("turn"):
+                _render_turn(item["turn"])
+            else:
+                st.markdown(item["content"])
+
     query = st.chat_input(
-        "Ask about Singapore, weather, or a currency conversion"
+        "Plan a trip, ask about Singapore, weather, or a currency conversion"
     )
     if query:
+        st.session_state.messages.append({"role": "user", "content": query, "turn": None})
+        history = [
+            ChatMessage(role=item["role"], content=item["content"])
+            for item in st.session_state.messages[:-1]
+        ]
         with st.chat_message("user"):
-            st.write(query)
+            st.markdown(query)
         with st.chat_message("assistant"):
-            routed = route_question(query)
-            called_tool = False
-            if routed.use_weather:
-                weather = call_weather_forecast(
-                    routed.weather_location, routed.weather_days
-                )
-                _render_weather(weather)
-                called_tool = True
-            if routed.use_currency:
-                if routed.amount is None or not routed.from_currency or not routed.to_currency:
-                    st.warning(
-                        "A currency conversion was requested, but the amount "
-                        "or currency pair could not be read. No rate was invented."
-                    )
-                else:
-                    fx = call_convert_currency(
-                        routed.amount, routed.from_currency, routed.to_currency
-                    )
-                    _render_currency(fx)
-                called_tool = True
-            if routed.use_rag or not called_tool:
-                _render_rag(query)
+            with st.spinner("Retrieving knowledge and current information..."):
+                turn = run_turn(query, history)
+            _render_turn(turn)
+        st.session_state.messages.append(
+            {"role": "assistant", "content": turn.answer, "turn": turn}
+        )
 
     with st.expander("System prompt"):
         st.code(SYSTEM_PROMPT, language="markdown")

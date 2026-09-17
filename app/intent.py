@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 WEATHER_RE = re.compile(
     r"\b(weather|forecast|temperature|rain|raining|umbrella|humid|"
-    r"indoor or outdoor|outdoor activities tomorrow)\b",
+    r"indoor or outdoor|outdoor activities tomorrow|adjust.{0,40}weather)\b",
     re.IGNORECASE,
 )
 CURRENCY_RE = re.compile(
@@ -73,8 +73,12 @@ def route_question(question: str, default_location: str = "Singapore") -> Routed
     days_match = DAYS_RE.search(question)
     if days_match:
         days = max(1, min(int(days_match.group(2)), 7))
+    if "next week" in question.lower():
+        days = max(days, 7)
+    elif "three-day" in question.lower() or "3-day" in question.lower() or "3 day" in question.lower():
+        days = max(days, 3)
     elif "tomorrow" in question.lower():
-        days = 2
+        days = max(days, 2)
 
     amount, from_code, to_code = _parse_currency(question)
     if amount is not None and from_code and to_code:
